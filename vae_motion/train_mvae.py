@@ -39,6 +39,7 @@ class StatsLogger:
         em, es = divmod(elapsed, 60)
         rm, rs = divmod(remaining, 60)
 
+        #rm += 1e-9
         if self.progress_format is None:
             time_format = "%{:d}dm %02ds".format(int(np.log10(rm) + 1))
             perc_format = "%{:d}d %5.1f%%".format(int(np.log10(self.num_epochs) + 1))
@@ -62,8 +63,8 @@ class StatsLogger:
         )
 
 
-def feed_vae(pose_vae, ground_truth, condition, future_weights):
-    condition = condition.flatten(start_dim=1, end_dim=2)
+def feed_vae(pose_vae, ground_truth, condition, future_weights): #conditions gt : (args.mini_batch_size, args.num_condition_frames, frame_size)
+    condition = condition.flatten(start_dim=1, end_dim=2) 
     flattened_truth = ground_truth.flatten(start_dim=1, end_dim=2)
 
     output_shape = (-1, pose_vae.num_future_predictions, pose_vae.frame_size)
@@ -115,7 +116,7 @@ def main():
     # setup parameters
     args = SimpleNamespace(
         device="cuda:0" if torch.cuda.is_available() else "cpu",
-        mocap_file=os.path.join(env_path, "mocap.npz"),
+        mocap_file=os.path.join(env_path, "mocap_running.npz"),
         norm_mode="zscore",
         latent_size=32,
         num_embeddings=12,
@@ -124,7 +125,7 @@ def main():
         num_future_predictions=1,
         num_steps_per_rollout=8,
         kl_beta=1.0,
-        load_saved_model=True,
+        load_saved_model=False,
     )
 
     # learning parameters
@@ -292,7 +293,7 @@ def main():
                         pose_vae, ground_truth, condition, future_weights
                     )
 
-                history = history.roll(1, dims=1)
+                history = history.roll(1, dims=1)   # rolled in conditioned frame dimension
                 next_frame = vae_output[:, 0] if use_student else ground_truth[:, 0]
                 history[:, 0].copy_(next_frame.detach())
 
@@ -302,6 +303,8 @@ def main():
 
                 ep_recon_loss += float(recon_loss) / args.num_steps_per_rollout
                 ep_kl_loss += float(kl_loss) / args.num_steps_per_rollout
+            # print("ep_recon_loss: {}".format(ep_recon_loss))
+            # print("ep_kl_loss: {}".format(ep_kl_loss) )
 
         avg_ep_recon_loss = ep_recon_loss / num_mini_batch
         avg_ep_kl_loss = ep_kl_loss / num_mini_batch
