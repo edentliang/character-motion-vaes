@@ -15,14 +15,15 @@ from algorithms.storage import RolloutStorage
 from common.logging_utils import CSVLogger
 from common.misc_utils import update_linear_schedule, update_exponential_schedule
 from vae_motion.models import PoseVAEController, PoseVAEPolicy
-
+import environments
 
 def make_gym_environment(args):
 
     pose_vae_path = os.path.join(current_dir, args.vae_path)
 
     env = gym.make(
-        "{}:{}".format(args.env_module, args.env_name),
+        #"{}:{}".format(args.env_module, args.env_name),
+        args.env_name,
         num_parallel=args.num_parallel,
         device=args.device,
         pose_vae_path=pose_vae_path,
@@ -97,10 +98,10 @@ def main():
 
     # env parameters
     args.action_size = env.action_space.shape[0]
-    args.observation_size = env.observation_space.shape[0]
+    args.observation_size = env.observation_space.shape[0] # 267 + 2 (target dim)
 
     # other configs
-    args.save_path = os.path.join(current_dir, "con_" + args.env_name + ".pt")
+    args.save_path = os.path.join(current_dir, "con(test)_" + args.env_name + ".pt")
 
     # sampling parameters
     args.num_frames = 10e7
@@ -165,7 +166,7 @@ def main():
         actor_critic.state_size,
     )
     obs = env.reset()
-    rollouts.observations[0].copy_(obs)
+    rollouts.observations[0].copy_(obs) #condition and target 
     rollouts.to(args.device)
 
     log_path = os.path.join(current_dir, "log_ppo_progress-{}".format(args.env_name))
@@ -203,7 +204,7 @@ def main():
                 ep_info["reward"].append(ep_reward[done].clone())
                 ep_reward *= (~done).float()  # zero out the dones
                 reset_indices = env.parallel_ind_buf.masked_select(done.squeeze())
-                obs = env.reset(reset_indices)
+                obs = env.reset(indices=reset_indices)
 
             if end_of_rollout:
                 obs = env.reset()
@@ -213,7 +214,7 @@ def main():
             )
 
         with torch.no_grad():
-            next_value = actor_critic.get_value(rollouts.observations[-1]).detach()
+            next_value = actor_critic.get_value(rollouts.observations[-1]).detach() #obs: 1201,100,296
 
         rollouts.compute_returns(next_value, use_gae, gamma, gae_lambda)
 

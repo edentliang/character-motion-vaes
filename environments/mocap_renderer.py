@@ -15,15 +15,15 @@ import torch.nn.functional as F
 from common.bullet_objects import VSphere, VCylinder, VCapsule, FlagPole, Arrow
 from common.bullet_utils import BulletClient, Camera, SinglePlayerStadiumScene
 
-
-FOOT2METER = 0.3048
+#FIXME
+FOOT2METER = 0.3048/4
 DEG2RAD = np.pi / 180
 FADED_ALPHA = 1.0
 
 
 def extract_joints_xyz(v, x_ind, y_ind, z_ind, dim=0):
-    x = v.index_select(dim=dim, index=x_ind)
-    y = v.index_select(dim=dim, index=z_ind)
+    x = v.index_select(dim=dim, index=x_ind) #[1,22]
+    y = v.index_select(dim=dim, index=z_ind) #data.z -> y 
     z = v.index_select(dim=dim, index=y_ind)
     return x, y, z
 
@@ -44,6 +44,14 @@ class PBLMocapViewer:
         self.x_indices = indices[slice(3, 69, 3)] if x_ind is None else x_ind
         self.y_indices = indices[slice(4, 69, 3)] if y_ind is None else y_ind
         self.z_indices = indices[slice(5, 69, 3)] if z_ind is None else z_ind
+
+        #for 31 joints
+        num_joints = 31 * 3+3
+        indices = torch.arange(0, num_joints).long()
+        self.x_indices = indices[slice(3, num_joints, 3)] if x_ind is None else x_ind
+        self.y_indices = indices[slice(4, num_joints, 3)] if y_ind is None else y_ind
+        self.z_indices = indices[slice(5, num_joints, 3)] if z_ind is None else z_ind
+        
         self.joint_indices = (self.x_indices, self.y_indices, self.z_indices)
 
         self.env = env
@@ -165,16 +173,16 @@ class PBLMocapViewer:
     def render(self, frames, facings, root_xzs, time_remain, action):
 
         x, y, z = extract_joints_xyz(frames, *self.joint_indices, dim=1)
-        mat = self.env.get_rotation_matrix(facings).to(self.device)
-        rotated_xy = torch.matmul(mat, torch.stack((x, y), dim=1))
-        poses = torch.cat((rotated_xy, z.unsqueeze(dim=1)), dim=1).permute(0, 2, 1)
+        mat = self.env.get_rotation_matrix(facings).to(self.device) #yaw 
+        rotated_xy = torch.matmul(mat, torch.stack((x, y), dim=1)) #data x,z
+        poses = torch.cat((rotated_xy, z.unsqueeze(dim=1)), dim=1).permute(0, 2, 1) #[1,3,22]
         root_xyzs = F.pad(root_xzs, pad=[0, 1])
 
-        joint_xyzs = ((poses + root_xyzs.unsqueeze(dim=1)) * FOOT2METER).cpu().numpy()
+        joint_xyzs = ((poses + root_xyzs.unsqueeze(dim=1)) * FOOT2METER).cpu().numpy() #relative to root 
         self.root_xyzs = (
-            (F.pad(root_xzs, pad=[0, 1], value=3) * FOOT2METER).cpu().numpy()
-        )
-        self.joint_xyzs = joint_xyzs
+            (F.pad(root_xzs, pad=[0, 1], value=3) * FOOT2METER).cpu().numpy() # z = 3 feet 
+        ) #[1,3]
+        self.joint_xyzs = joint_xyzs #[1,22,3]
 
         for index in range(self.num_characters):
             self.characters.set_joint_positions(joint_xyzs[index], index)
@@ -410,9 +418,10 @@ class PBLMocapViewer:
 
 
 class MultiMocapCharacters:
-    def __init__(self, bc, num_characters, colours=None, links=True):
+    def __init__(self, bc, num_characters, colours=None, links=False):
         self._p = bc
-        self.num_joints = 22
+        # FIXME 
+        self.num_joints = 31 #22 / 31
         total_parts = num_characters * self.num_joints
 
         # create all spheres at once using batchPositions

@@ -16,8 +16,8 @@ import torch.nn.functional as F
 from common.misc_utils import line_to_point_distance
 from environments.mocap_renderer import extract_joints_xyz
 
-
-
+#foot_z_ind
+#joint_indices
 FOOT2METER = 0.3048
 METER2FOOT = 1 / 0.3048
 
@@ -104,12 +104,13 @@ class EnvBase(gym.Env):
                 use_params=use_params,
                 camera_tracking=camera_tracking,
             )
+            ##init head and joint
 
         high = np.inf * np.ones([self.action_dim])
         self.action_space = gym.spaces.Box(-high, high, dtype=np.float32)
 
     def load_data(self, pose_vae_path):
-        mocap_file = os.path.join(current_dir, "pose0.npy")
+        mocap_file = os.path.join(current_dir, "pose_pfnn.npy")
         data = torch.from_numpy(np.load(mocap_file))
         self.mocap_data = data.float().to(self.device)
 
@@ -133,16 +134,16 @@ class EnvBase(gym.Env):
 
     def integrate_root_translation(self, pose):
         mat = self.get_rotation_matrix(self.root_facing)
-        displacement = (mat * pose[:, 0:2].unsqueeze(1)).sum(dim=2)
-        self.root_facing.add_(pose[:, [2]]).remainder_(2 * np.pi)
+        displacement = (mat * pose[:, 0:2].unsqueeze(1)).sum(dim=2) #root_facing @ data x,y
+        self.root_facing.add_(pose[:, [2]]).remainder_(2 * np.pi) #env y + data z 
         self.root_xz.add_(displacement)
 
         self.history = self.history.roll(1, dims=1)
         self.history[:, 0].copy_(pose)
 
-        foot_z = pose[:, self.foot_z_ind].unsqueeze(-1)
+        foot_z = pose[:, self.foot_z_ind].unsqueeze(-1) # data y 
         foot_xy = pose[:, self.foot_xy_ind]
-        foot_pos = torch.cat((self.root_xz.unsqueeze(1) + foot_xy, foot_z), dim=-1)
+        foot_pos = torch.cat((self.root_xz.unsqueeze(1) + foot_xy, foot_z), dim=-1) #[1,2,3]
         self.foot_pos_history = self.foot_pos_history.roll(1, dims=1)
         self.foot_pos_history[:, 0].copy_(foot_pos.flatten(1, 2))
 
@@ -183,7 +184,7 @@ class EnvBase(gym.Env):
                 -1,
                 self.pose_vae_model.num_future_predictions,
                 self.pose_vae_model.frame_size,
-            )
+            ) #[1,1,267  (3 xy positon and z rotation +22*(3+3+6(upper forward  x,y )))] 
 
         next_frame = self.pose_vae_model.denormalize(vae_output)
         return next_frame
