@@ -19,6 +19,7 @@ from environments.mocap_renderer import extract_joints_xyz
 #foot_z_ind
 #joint_indices
 #meter2foot
+#num_joints
 FOOT2METER = 0.3048
 METER2FOOT = 1 / 0.3048
 
@@ -96,7 +97,7 @@ class EnvBase(gym.Env):
         self.contact_threshold = 0.03 * METER2FOOT
         self.foot_pos_history = torch.zeros((self.num_parallel, 2, 6)).to(self.device)
         
-        #for 31 joints
+        #for 31 joints // origin 69
         num_joints = 31 * 3+3  # 21 // 33
 
         indices = torch.arange(0, num_joints).long().to(self.device)
@@ -121,7 +122,7 @@ class EnvBase(gym.Env):
         self.action_space = gym.spaces.Box(-high, high, dtype=np.float32)
 
     def load_data(self, pose_vae_path):
-        mocap_file = os.path.join(current_dir, "pose.npy")
+        mocap_file = os.path.join(current_dir, "pose_pfnn.npy")
         data = torch.from_numpy(np.load(mocap_file))
         self.mocap_data = data.float().to(self.device)
 
@@ -261,6 +262,14 @@ class EnvBase(gym.Env):
             + next_frame[:, 2].pow(2)
             + next_frame[:, 69:135].pow(2).mean(1)
         )
+        #num_joints = 31 * 3+3 = 96
+        action_energy = (
+            next_frame[:, [0, 1]].pow(2).sum(1)
+            + next_frame[:, 2].pow(2)
+            + next_frame[:, 96:(96+31*3)].pow(2).mean(1)
+        )
+
+
         return -0.8 * action_energy.unsqueeze(dim=1)
 
     def calc_action_penalty(self):
