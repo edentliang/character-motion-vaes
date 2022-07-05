@@ -18,6 +18,7 @@ from environments.mocap_renderer import extract_joints_xyz
 
 #foot_z_ind
 #joint_indices
+#meter2foot
 FOOT2METER = 0.3048
 METER2FOOT = 1 / 0.3048
 
@@ -83,15 +84,25 @@ class EnvBase(gym.Env):
 
         # 4 and 7 are height for right and left toes respectively
         # y-axis in the data, but z-axis in the env
-        self.foot_xy_ind = torch.LongTensor([[3, 5], [6, 8]])
-        self.foot_z_ind = torch.LongTensor([4, 7])
+        # self.foot_xy_ind = torch.LongTensor([[3, 5], [6, 8]])
+        # self.foot_z_ind = torch.LongTensor([4, 7])
+
+        #5 ,10 for left and right toe
+
+        self.foot_xy_ind = torch.LongTensor([[18, 20], [33, 35]])
+        self.foot_z_ind = torch.LongTensor([19, 34])
+
+
         self.contact_threshold = 0.03 * METER2FOOT
         self.foot_pos_history = torch.zeros((self.num_parallel, 2, 6)).to(self.device)
+        
+        #for 31 joints
+        num_joints = 31 * 3+3  # 21 // 33
 
-        indices = torch.arange(0, 69).long().to(self.device)
-        x_indices = indices[slice(3, 69, 3)]
-        y_indices = indices[slice(4, 69, 3)]
-        z_indices = indices[slice(5, 69, 3)]
+        indices = torch.arange(0, num_joints).long().to(self.device)
+        x_indices = indices[slice(3, num_joints, 3)]
+        y_indices = indices[slice(4, num_joints, 3)]
+        z_indices = indices[slice(5, num_joints, 3)]
         self.joint_indices = (x_indices, y_indices, z_indices)
 
         if self.is_rendered:
@@ -110,13 +121,13 @@ class EnvBase(gym.Env):
         self.action_space = gym.spaces.Box(-high, high, dtype=np.float32)
 
     def load_data(self, pose_vae_path):
-        mocap_file = os.path.join(current_dir, "pose_pfnn.npy")
+        mocap_file = os.path.join(current_dir, "pose.npy")
         data = torch.from_numpy(np.load(mocap_file))
         self.mocap_data = data.float().to(self.device)
 
         if os.path.isdir(pose_vae_path):
             basepath = os.path.normpath(pose_vae_path)
-            pose_vae_path = glob.glob(os.path.join(basepath, "posevae*.pt"))[0]
+            pose_vae_path = glob.glob(os.path.join(basepath, "posevae*38.pt"))[0]
         else:
             basepath = os.path.dirname(pose_vae_path)
 
@@ -425,7 +436,7 @@ class TargetEnv(EnvBase):
 
         self.observation_dim = (self.frame_dim * self.num_condition_frames) + target_dim
         high = np.inf * np.ones([self.observation_dim])
-        self.observation_space = gym.spaces.Box(-high, high, dtype=np.float32)
+        self.observation_space = gym.spaces.Box(-high, high, dtype=np.float32)  # ?
 
     def calc_potential(self):
         target_delta, target_angle = self.get_target_delta_and_angle()
@@ -434,6 +445,8 @@ class TargetEnv(EnvBase):
 
     def get_target_delta_and_angle(self):
         target_delta = self.target - self.root_xz
+        # print(self.root_xz)
+        # print(self.target)
         target_angle = (
             torch.atan2(target_delta[:, 1], target_delta[:, 0]).unsqueeze(1)
             + self.root_facing
@@ -536,8 +549,7 @@ class TargetEnv(EnvBase):
         self.substep = (self.substep + 1) % self.frame_skip
 
         self.integrate_root_translation(next_frame)
-
-        progress = self.calc_progress_reward()
+        progress = self.calc_progress_reward() #[100,1]
 
         # Check if target is reached
         # Has to be done after new potentials are calculated
