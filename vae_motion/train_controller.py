@@ -170,7 +170,7 @@ def main():
     rollouts.observations[0].copy_(obs) #condition and target 
     rollouts.to(args.device)
 
-    log_path = os.path.join(current_dir, "log_ppo_progress-{}".format(args.env_name))
+    log_path = os.path.join(current_dir, "log_ppo_progress-{}-{}".format(args.env_name,args.test_name))
     logger = StatsLogger(csv_path=log_path)
 
     for update in range(args.num_updates): #833
