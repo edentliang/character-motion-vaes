@@ -86,7 +86,7 @@ def main():
         env_module="environments",
         env_name="TargetEnv-v0",
         test_name = '0',
-        device="cuda:1" if torch.cuda.is_available() else "cpu",
+        device="cuda:0" if torch.cuda.is_available() else "cpu",
         num_parallel=100,
         vae_path="models/",
         frame_skip=1,
