@@ -116,6 +116,7 @@ def main():
     # setup parameters
     args = SimpleNamespace(
         device="cuda:0" if torch.cuda.is_available() else "cpu",
+        #device='mps',
         mocap_file=os.path.join(env_path, "mocap_running.npz"),
         norm_mode="zscore",
         latent_size=32,
@@ -298,13 +299,16 @@ def main():
                 history[:, 0].copy_(next_frame.detach())
 
                 vae_optimizer.zero_grad()
+                # if recon_loss > 100:
+                #     print('ereer')
                 (recon_loss + args.kl_beta * kl_loss).backward()
+                #torch.nn.utils.clip_grad_norm_(pose_vae.parameters(), 1)
                 vae_optimizer.step()
 
                 ep_recon_loss += float(recon_loss) / args.num_steps_per_rollout
                 ep_kl_loss += float(kl_loss) / args.num_steps_per_rollout
-            # print("ep_recon_loss: {}".format(ep_recon_loss))
-            # print("ep_kl_loss: {}".format(ep_kl_loss) )
+            print("ep_recon_loss: {}".format(ep_recon_loss))
+            print("ep_kl_loss: {}".format(ep_kl_loss))
 
         avg_ep_recon_loss = ep_recon_loss / num_mini_batch
         avg_ep_kl_loss = ep_kl_loss / num_mini_batch
