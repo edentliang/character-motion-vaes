@@ -85,7 +85,8 @@ def main():
     args = SimpleNamespace(
         env_module="environments",
         env_name="TargetEnv-v0",
-        device="cuda:0" if torch.cuda.is_available() else "cpu",
+        test_name = '0',
+        device="cuda:1" if torch.cuda.is_available() else "cpu",
         num_parallel=100,
         vae_path="models/",
         frame_skip=1,
@@ -97,11 +98,11 @@ def main():
     env = make_gym_environment(args)
 
     # env parameters
-    args.action_size = env.action_space.shape[0]
-    args.observation_size = env.observation_space.shape[0] # 267 + 2 (target dim)
+    args.action_size = env.action_space.shape[0]  #32
+    args.observation_size = env.observation_space.shape[0] #(3+22*12)267 + 2 (target dim)
 
     # other configs
-    args.save_path = os.path.join(current_dir, "con(test)_" + args.env_name + ".pt")
+    args.save_path = os.path.join(current_dir, "con_test_" + args.env_name + " " + args.test_name + ".pt")
 
     # sampling parameters
     args.num_frames = 10e7
@@ -172,7 +173,7 @@ def main():
     log_path = os.path.join(current_dir, "log_ppo_progress-{}".format(args.env_name))
     logger = StatsLogger(csv_path=log_path)
 
-    for update in range(args.num_updates):
+    for update in range(args.num_updates): #833
 
         ep_info = {"reward": []}
         ep_reward = 0
@@ -192,7 +193,7 @@ def main():
                 value, action, action_log_prob = actor_critic.act(
                     rollouts.observations[step]
                 )
-
+            # action dim = 32, as latent 
             obs, reward, done, info = env.step(action)
             ep_reward += reward
 
