@@ -102,7 +102,7 @@ def main():
     args.observation_size = env.observation_space.shape[0] #(3+22*12)267 + 2 (target dim)
 
     # other configs
-    args.save_path = os.path.join(current_dir, "con_test_" + args.env_name + " " + args.test_name + ".pt")
+    args.save_path = os.path.join(current_dir, "con_test_" + args.env_name + "_" + args.test_name + ".pt")
 
     # sampling parameters
     args.num_frames = 10e7
